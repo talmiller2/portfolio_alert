@@ -1,0 +1,4 @@
+tolerance 5%
+VOO 30%
+TLT 30%
+cash 40%
