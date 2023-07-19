@@ -1,8 +1,8 @@
-
 import numpy as np
 import yfinance as yf
 import datetime
 import copy
+import os
 from email_functions import send_email
 
 def run_portfolio_alert_algorithm(target_portfolio_file, portfolio_file, email_details_file):
@@ -75,7 +75,7 @@ def run_portfolio_alert_algorithm(target_portfolio_file, portfolio_file, email_d
 
 def read_target_portfolio(target_portfolio_file='target_portfolio.txt'):
     # read and interpret target_portfolio file
-    with open(target_portfolio_file) as f:
+    with open(os.path.dirname(__file__) + '/' + target_portfolio_file) as f:
         lines = f.readlines()
     portfolio_target_weights = {}
     position_type = {}
@@ -140,8 +140,7 @@ def check_portfolio_target_weights(portfolio_target_weights, position_type):
 
 def read_portfolio(portfolio_file='portfolio.txt'):
     # read portfolio file which records the portfolio history
-    portfolio_file = 'portfolio.txt'
-    with open(portfolio_file) as f:
+    with open(os.path.dirname(__file__) + '/' + portfolio_file) as f:
         lines = f.readlines()
     portfolio_history = {}
     for line in lines:
@@ -220,7 +219,7 @@ def update_portfolio_file(portfolio_file, portfolio, portfolio_history, date_tod
     portfolio_last = portfolio
     portfolio = {}
     portfolio_sum = 0
-    with open(portfolio_file, 'a') as f:
+    with open(os.path.dirname(__file__) + '/' + portfolio_file, 'a') as f:
         updated_portfolio_line = '\n' + date_today + ': '
         for ticker in portfolio_last.keys():
             if ticker != 'cash':

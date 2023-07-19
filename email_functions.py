@@ -2,6 +2,7 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import html
+import os
 
 def send_email(subject, message, email_details_file='email_details.txt'):
     """
@@ -18,7 +19,7 @@ def send_email(subject, message, email_details_file='email_details.txt'):
     tutorial https://support.google.com/accounts/answer/185833?hl=en
     """
     email_details = {}
-    with open(password_file) as f:
+    with open(os.path.dirname(__file__) + '/' + email_details_file) as f:
         lines = f.readlines()
         for line in lines:
             element, value = line.split('\n')[0].split(' ')
