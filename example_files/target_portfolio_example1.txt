@@ -1,4 +1,4 @@
-tolerance 5%
+tolerance 10%
 TSLA >10%
 UPRO 45%
 TMF 55%

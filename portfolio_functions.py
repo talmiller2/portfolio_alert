@@ -5,7 +5,7 @@ import datetime
 import copy
 from email_functions import send_email
 
-def run_portfolio_alert_algorithm(target_portfolio_file, portfolio_file):
+def run_portfolio_alert_algorithm(target_portfolio_file, portfolio_file, email_details_file):
     tolerance, position_type, portfolio_target_weights, minimal_weight_positions = read_target_portfolio(
         target_portfolio_file)
 
@@ -64,7 +64,12 @@ def run_portfolio_alert_algorithm(target_portfolio_file, portfolio_file):
                                                         instructions,
                                                         portfolio_status_post_string)
 
-            send_email(subject_line, message_lines)
+            if email_details_file is None:
+                print(subject_line)
+                for line in message_lines:
+                    print(line)
+            else:
+                send_email(subject_line, message_lines, email_details_file=email_details_file)
 
     return
 
@@ -291,7 +296,7 @@ def rebalance_portfolio(portfolio_new, portfolio_sum, minimal_weight_positions, 
     delta_minimal_weights_total = 0
     portfolio_new2 = copy.deepcopy(portfolio_new)
     for ticker in minimal_weight_positions:
-        delta = portfolio_sum * (portfolio_target_weights[ticker] - portfolio_sum[ticker]) / 100.0
+        delta = portfolio_sum * (portfolio_target_weights[ticker] - portfolio_new[ticker]) / 100.0
         if delta > 0:
             deltas_dict[ticker] = delta
             portfolio_new2[ticker] += delta
@@ -388,19 +393,24 @@ def compose_rebalancing_instructions(sell_integer_stocks_dict, sell_integer_valu
                                      buy_integer_stocks_dict, buy_integer_value_dict):
     # print the instructions
     instructions = ['=== Rabalancing Instructions ===']
-    instructions += ['Sell list:']
-    for ticker in sell_integer_stocks_dict.keys():
-        if ticker != 'cash':
-            instruction = ticker + ': ' + str(sell_integer_stocks_dict[ticker]) \
-                          + ' stocks (worth $' + '{:.2f}'.format(sell_integer_value_dict[ticker]) + ')'
-            if ticker in total_sell_positions:
-                instruction += ' (liquidate entire position)'
-            instructions += [instruction]
-    instructions += ['Buy list:']
-    for ticker in buy_integer_stocks_dict.keys():
-        if ticker != 'cash':
-            instructions += [ticker + ': ' + str(buy_integer_stocks_dict[ticker])
-                             + ' stocks (worth $' + '{:.2f}'.format(buy_integer_value_dict[ticker]) + ')']
+
+    if len(sell_integer_stocks_dict) > 0:
+        instructions += ['Sell list:']
+        for ticker in sell_integer_stocks_dict.keys():
+            if ticker != 'cash':
+                instruction = ticker + ': ' + str(sell_integer_stocks_dict[ticker]) \
+                              + ' stocks (worth $' + '{:.2f}'.format(sell_integer_value_dict[ticker]) + ')'
+                if ticker in total_sell_positions:
+                    instruction += ' (liquidate entire position)'
+                instructions += [instruction]
+
+    if len(buy_integer_stocks_dict) > 0:
+        instructions += ['Buy list:']
+        for ticker in buy_integer_stocks_dict.keys():
+            if ticker != 'cash':
+                instructions += [ticker + ': ' + str(buy_integer_stocks_dict[ticker])
+                                 + ' stocks (worth $' + '{:.2f}'.format(buy_integer_value_dict[ticker]) + ')']
+
     return instructions
 
 def compose_email(date_today, portfolio_status_string, target_portfolio_string, instructions,

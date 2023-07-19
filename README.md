@@ -1,21 +1,18 @@
 # portfolio_alert
 
-A portfolio with multiple positions can be rebalanced with some frequency (e.g. monthly or quartely), or when the weights of the positions exceed some predetermined tolerance value. This code aims to help with the second case. 
+Rebalancing a portfolio based on target weights can be done with some frequency (e.g. monthly or quartely), or actively based on a deviation of the portfolio weights from the target weights. This code is designed for the latter, but can trivially be also used for the former.  
 
-Monitor your portfolio weights vs some target weights and alert by email if rebalancing is required.
-- Currently only supports positions denoted in USD and that can be accessed with the yfinance python package (stock names as in Yahoo Finance).
+The run_portfolio_alert.py script monitors your portfolio (instantly or daily as a cron job), and alerts by email if rebalancing is required, while also giving the exact rebalancing instructions.
+This directory needs to contain the files:
+- email_details.txt: Details to the email (if none then will print to screen).
+- portfolio.txt: Log the status of the portfolio positions for different dates. The code will update the portfolio as it changes with time. Only the last line is relavant for the code.
+- target_portfolio.txt: Define the target weights of the portfolio and the tolerance % for rebalancing.
+
+Notes:
+- Currently only supports positions denoted in USD and that can be accessed with the yfinance python package (stock names as they appear in Yahoo Finance).
 - Cash is also a valid position.
 - Positions can have two types "rebalanced" or "minimal_weight". 
-- The minimal_weight positions must be less that 100%, and the rebalanced positions need to add up to 100% (relative to what is left apart from the minimal_weight portion of the portfolio).
+- The minimal_weight positions must sum to less than 100%, and the rebalanced positions need to add up to exactly 100% (relative to what is left apart from the minimal_weight portion of the portfolio).
 - The tolerance is given in percents. Meaning, if any position weight exceeds its target weight by that amount of percents, a rebalancing alert is triggered.
 
-
-Example for a valid "target_portfolio.txt" input file with two "minimal_weight" positions and three "rebalanced" positions:
-```
-    tolerance 5%
-    BRK-B >4%
-    GME >2%
-    VOO 45%
-    TLT 45%
-    cash 10%
-```
+Example input files are in the example_files directory.

@@ -3,10 +3,10 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import html
 
-def send_email(subject, message, password_file='email_details.txt'):
+def send_email(subject, message, email_details_file='email_details.txt'):
     """
     sends an email with the input message.
-    requires the password_file with the content (for gmail):
+    requires the email_details_file with the content (for gmail):
     "
         smtp_server smtp.gmail.com
         port 587
