@@ -415,7 +415,7 @@ def compose_rebalancing_instructions(sell_integer_stocks_dict, sell_integer_valu
 def compose_email(date_today, portfolio_status_string, target_portfolio_string, instructions,
                   portfolio_status_post_string):
     # add a section about the current stock prices and the state of the portfolio before and after the rebalancing
-    subject_line = 'Subject: Portfolio Alert! (' + date_today + ')'
+    subject_line = 'Portfolio Alert! (' + date_today + ')'
     message_lines = portfolio_status_string + [''] + target_portfolio_string + [''] \
                     + instructions + [''] + portfolio_status_post_string
     return subject_line, message_lines
