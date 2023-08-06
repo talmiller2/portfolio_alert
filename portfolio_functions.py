@@ -18,7 +18,8 @@ def run_portfolio_alert_algorithm(target_portfolio_file, portfolio_file, email_d
     portfolio_weights, portfolio_sum, portfolio_reb_weights, portfolio_reb_sum = calculate_portfolio_weights(
         portfolio, position_type)
 
-    portfolio_status_string = define_portfolio_status_string(portfolio, portfolio_weights, portfolio_sum)
+    portfolio_status_string = define_portfolio_status_string(portfolio, position_type, portfolio_weights,
+                                                             portfolio_reb_weights, portfolio_sum)
 
     # update the portfolio file with the price movement since the last update if needed
     last_date = date
@@ -28,8 +29,8 @@ def run_portfolio_alert_algorithm(target_portfolio_file, portfolio_file, email_d
 
         stock_prices_last, stock_prices_today = get_stock_prices(last_date, portfolio, portfolio_target_weights)
 
-        portfolio_history = update_portfolio_file(portfolio_file, portfolio, portfolio_history, date_today,
-                                                  stock_prices_last, stock_prices_today)
+        update_portfolio_file(portfolio_file, portfolio, portfolio_history, date_today, stock_prices_last,
+                              stock_prices_today, portfolio_weights)
 
         portfolio_new, deltas_dict, total_sell_positions = sell_irrelevant_positions(portfolio,
                                                                                      portfolio_target_weights)
@@ -53,7 +54,8 @@ def run_portfolio_alert_algorithm(target_portfolio_file, portfolio_file, email_d
             portfolio_weights, portfolio_sum, portfolio_reb_weights, portfolio_reb_sum = calculate_portfolio_weights(
                 portfolio_new3, position_type)
 
-            portfolio_status_post_string = define_portfolio_status_post_string(portfolio_new3, portfolio_weights,
+            portfolio_status_post_string = define_portfolio_status_post_string(portfolio_new3, position_type,
+                                                                               portfolio_weights, portfolio_reb_weights,
                                                                                portfolio_sum)
 
             instructions = compose_rebalancing_instructions(sell_integer_stocks_dict, sell_integer_value_dict,
@@ -137,7 +139,7 @@ def check_portfolio_target_weights(portfolio_target_weights, position_type):
     if percent_counter_rebalanced != 100:
         raise ValueError('positions of "rebalanced" type do not add to 100%')
     return
-
+#
 def read_portfolio(portfolio_file='portfolio.txt'):
     # read portfolio file which records the portfolio history
     with open(os.path.dirname(__file__) + '/' + portfolio_file) as f:
@@ -147,13 +149,21 @@ def read_portfolio(portfolio_file='portfolio.txt'):
         if line != '\n':
             date = line.split(':')[0]
             elements = line.split(':')[1].split('\n')[0].strip().split(' ')
-            tickers = elements[0::2]
-            values = elements[1::2]
+
+            if '(' in line or ')' in line: # skip the portfolio fraction information
+                tickers = elements[0::3]
+                values_raw = elements[1::3]
+            else:
+                tickers = elements[0::2]
+                values_raw = elements[1::2]
+            values = [v.split('$')[-1] for v in values_raw]
+
             portfolio = {}
             portfolio_sum = 0
             for ticker, value in zip(tickers, values):
-                portfolio[ticker] = float(value)
-                portfolio_sum += portfolio[ticker]
+                if ticker != 'total':
+                    portfolio[ticker] = float(value)
+                    portfolio_sum += portfolio[ticker]
             portfolio_history[date] = portfolio
     return date, portfolio, portfolio_history
 
@@ -182,11 +192,14 @@ def calculate_portfolio_weights(portfolio, position_type, verbosity=False):
 
     return portfolio_weights, portfolio_sum, portfolio_reb_weights, portfolio_reb_sum
 
-def define_portfolio_status_string(portfolio, portfolio_weights, portfolio_sum):
+def define_portfolio_status_string(portfolio, position_type, portfolio_weights, portfolio_reb_weights, portfolio_sum):
     portfolio_status_string = ['=== Portfolio Status ===']
     for ticker in portfolio.keys():
-        portfolio_status_string += [ticker + ': $' + '{:.2f}'.format(portfolio[ticker])
-                                    + ' (' + '{:.2f}'.format(portfolio_weights[ticker]) + '%)']
+        curr_ticker_status = ticker + ': $' + '{:.2f}'.format(portfolio[ticker]) \
+                             + ' (' + '{:.2f}'.format(portfolio_weights[ticker]) + '%)'
+        if position_type[ticker] == 'rebalanced':
+            curr_ticker_status += ' [' + '{:.2f}'.format(portfolio_reb_weights[ticker]) + '% reb]'
+        portfolio_status_string += [curr_ticker_status]
     portfolio_status_string += ['*** TOTAL: $' + '{:.2f}'.format(portfolio_sum)]
     return portfolio_status_string
 
@@ -214,7 +227,8 @@ def get_stock_prices(last_date, portfolio, portfolio_target_weights):
 
     return stock_prices_last, stock_prices_today
 
-def update_portfolio_file(portfolio_file, portfolio, portfolio_history, date_today, stock_prices_last, stock_prices_today):
+def update_portfolio_file(portfolio_file, portfolio, portfolio_history, date_today, stock_prices_last,
+                          stock_prices_today, portfolio_weights):
     # update the portfolio (and log) with the price movement
     portfolio_last = portfolio
     portfolio = {}
@@ -224,12 +238,13 @@ def update_portfolio_file(portfolio_file, portfolio, portfolio_history, date_tod
         for ticker in portfolio_last.keys():
             if ticker != 'cash':
                 portfolio[ticker] = portfolio_last[ticker] * stock_prices_today[ticker] / stock_prices_last[ticker]
-                updated_portfolio_line += ticker + ' ' + '{:.2f}'.format(portfolio[ticker]) + ' '
             else:
                 # cash does not change
                 portfolio[ticker] = portfolio_last[ticker]
-                updated_portfolio_line += ticker + ' ' + '{:.2f}'.format(portfolio[ticker]) + ' '
+            updated_portfolio_line += ticker + ' $' + '{:.2f}'.format(portfolio[ticker]) \
+                                      + ' (' + '{:.2f}'.format(portfolio_weights[ticker]) + '%) '
             portfolio_sum += portfolio[ticker]
+        updated_portfolio_line += 'total $' + '{:.2f}'.format(portfolio_sum) + ' '
         portfolio_history[date_today] = portfolio
         f.write(updated_portfolio_line)
     return portfolio_history
@@ -337,10 +352,6 @@ def rebalance_portfolio(portfolio_new, portfolio_sum, minimal_weight_positions, 
     if abs(sum([deltas_dict[ticker] for ticker in deltas_dict.keys()])) > 1e-10:
         raise ValueError('deltas_dict does not sum to zero.')
 
-    portfolio_weights, portfolio_sum, portfolio_reb_weights, portfolio_reb_sum = calculate_portfolio_weights(
-        portfolio_new2, position_type)
-
-
     return portfolio_new2, deltas_dict
 
 def rebalance_with_integer_operations(portfolio, portfolio_new, deltas_dict, stock_prices_today):
@@ -378,12 +389,15 @@ def rebalance_with_integer_operations(portfolio, portfolio_new, deltas_dict, sto
            buy_integer_value_dict
 
 
-def define_portfolio_status_post_string(portfolio_new3, portfolio_weights, portfolio_sum):
+def define_portfolio_status_post_string(portfolio_new3, position_type, portfolio_weights, portfolio_reb_weights, portfolio_sum):
     portfolio_status_post_string = ['=== Portfolio Post Rebalancing (should approximately be) ===']
     for ticker in portfolio_new3.keys():
         if portfolio_weights[ticker] > 0.1:
-            portfolio_status_post_string += [ticker + ': $' + '{:.2f}'.format(portfolio_new3[ticker])
-                                             + ' (' + '{:.2f}'.format(portfolio_weights[ticker]) + '%)']
+            curr_ticker_status = ticker + ': $' + '{:.2f}'.format(portfolio_new3[ticker]) \
+                                 + ' (' + '{:.2f}'.format(portfolio_weights[ticker]) + '%)'
+            if position_type[ticker] == 'rebalanced':
+                curr_ticker_status += ' [' + '{:.2f}'.format(portfolio_reb_weights[ticker]) + '% reb]'
+            portfolio_status_post_string += [curr_ticker_status]
     portfolio_status_post_string += ['*** TOTAL: $' + '{:.2f}'.format(portfolio_sum)]
     return portfolio_status_post_string
 
