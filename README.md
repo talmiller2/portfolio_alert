@@ -23,7 +23,7 @@ Notes:
 The script "run_portfolio_alert.py" can also run offline without sending the alert by email if you want updated rebalancing instructions for example. But the real use is for it to run as a daily job and alert only if a rebalancing is required.
 
 In www.pythonanywhere.com, open a folder under the Files tab:
-![pythonanywhere_open_folder](screenshots/pythonanywhere_task.png)
+![pythonanywhere_open_folder](screenshots/pythonanywhere_open_folder.png)
 Dump the files in the folder:
 ![pythonanywhere_files](screenshots/pythonanywhere_files.png)
 Set up the cron job under the Tasks tab as follows with the command "python portfolio_alert/run_portfolio_alert.py":
