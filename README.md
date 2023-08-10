@@ -6,7 +6,7 @@ The run_portfolio_alert.py script monitors your portfolio (instantly or daily as
 This directory needs to contain the files:
 - email_details.txt: Details to the email (if none then will print to screen). Note that the password is not the standard gmail password but a dedicated "apps password", to set it up read the
     tutorial https://support.google.com/accounts/answer/185833?hl=en
-- portfolio.txt: Log the status of the portfolio positions for different dates. The code will update the portfolio as it changes with time. Only the last line is relavant for the code.
+- portfolio.txt: Write the status of the portfolio positions for the current date (in number of shares). The code will translate this to the actual value of the positions to use internally, but also update the file daily with the position weights. Only the last line of the file is used internally.
 - target_portfolio.txt: Define the target weights of the portfolio and the tolerance % for rebalancing.
 
 Notes:
