@@ -317,7 +317,7 @@ def rebalance_portfolio(portfolio_new, portfolio_sum, minimal_weight_positions, 
     delta_minimal_weights_total = 0
     portfolio_new2 = copy.deepcopy(portfolio_new)
     for ticker in minimal_weight_positions:
-        delta = portfolio_sum * (portfolio_target_weights[ticker] - portfolio_new[ticker]) / 100.0
+        delta = portfolio_sum * portfolio_target_weights[ticker] / 100.0 - portfolio_new[ticker]
         if delta > 0:
             deltas_dict[ticker] = delta
             portfolio_new2[ticker] += delta
@@ -329,7 +329,7 @@ def rebalance_portfolio(portfolio_new, portfolio_sum, minimal_weight_positions, 
 
     reduce_rebalanced_factor = (portfolio_reb_sum - delta_minimal_weights_total) / portfolio_reb_sum
     delta_rebalanced_total = 0
-    # for ticker in rebalanced_positions:
+
     for ticker in portfolio_new2.keys():
         if position_type[ticker] == 'rebalanced':
             delta = - (1 - reduce_rebalanced_factor) * portfolio_new2[ticker]
@@ -346,7 +346,6 @@ def rebalance_portfolio(portfolio_new, portfolio_sum, minimal_weight_positions, 
     # buy/sell the rebalanced positions
     for ticker in portfolio_new2.keys():
         if position_type[ticker] == 'rebalanced':
-            # for ticker in rebalanced_positions:
 
             if ticker not in portfolio_reb_weights.keys():
                 portfolio_reb_weights[ticker] = 0

@@ -11,10 +11,10 @@ This directory needs to contain the files:
 
 Notes:
 
-- Currently only supports positions denoted tranded in USD currency and that can be accessed with the yfinance python package (stock names as they appear in Yahoo Finance).
+- Currently only supports positions denoted tranded in USD currency and that can be accessed with the [``yfinance``](https://github.com/ranaroussi/yfinance) python package (stock names as they appear in Yahoo Finance).
 - Cash is also a valid position.
-- Positions can have two types "rebalanced" or "minimal_weight". 
-- The minimal_weight positions must sum to less than 100%, and the rebalanced positions need to add up to exactly 100% (relative to what is left apart from the minimal_weight portion of the portfolio).
+- Positions can have two types: "minimal_weight" or "rebalanced". 
+- The "minimal_weight" positions must sum to less than 100%, and the "rebalanced" positions need to add up to exactly 100% (relative to what is left apart from the "minimal_weight" portion of the portfolio).
 - The tolerance is given in percents. Meaning, if any position weight exceeds its target weight by that amount of percents, a rebalancing alert is triggered.
 - Example input files are in the example_files directory.
 
@@ -28,5 +28,5 @@ Dump the files in the folder:
 ![pythonanywhere_files](screenshots/pythonanywhere_files.png)
 Set up the cron job under the Tasks tab as follows with the command "python portfolio_alert/run_portfolio_alert.py":
 ![pythonanywhere_task](screenshots/pythonanywhere_task.png)
-Note that in the free version the cron job has a one month expiry date that would need to be renewd using the "Extend expiry" button. This kind of defies the purpose of this tool but is the best I came up with currently that is free.
+Note that in the free version the cron job has a one month expiry date that would need to be renewed using the "Extend expiry" button. This kind of defies the purpose of this tool but is the best I came up with, using free available options.
 
