@@ -1,75 +1,82 @@
+import copy
+import datetime
+import os
+import traceback
+
 import numpy as np
 import yfinance as yf
-import datetime
-import copy
-import os
+
 from email_functions import send_email
 
+
 def run_portfolio_alert_algorithm(target_portfolio_file, portfolio_file, email_details_file):
-    tolerance, position_type, portfolio_target_weights, minimal_weight_positions = read_target_portfolio(
-        target_portfolio_file)
+    try:
+        tolerance, position_type, portfolio_target_weights, minimal_weight_positions = read_target_portfolio(
+            target_portfolio_file)
 
-    target_portfolio_string = define_target_portfolio_string(portfolio_target_weights, position_type)
+        target_portfolio_string = define_target_portfolio_string(portfolio_target_weights, position_type)
 
-    check_portfolio_target_weights(portfolio_target_weights, position_type)
+        check_portfolio_target_weights(portfolio_target_weights, position_type)
 
-    portfolio_units, _ = read_portfolio(portfolio_file)
+        portfolio_units, _ = read_portfolio(portfolio_file)
 
-    tickers = list(dict.fromkeys(list(portfolio_units) + list(portfolio_target_weights)))
-    stock_prices = get_stock_prices(tickers)
-    portfolio = calculate_portfolio_positions(portfolio_units, stock_prices)
-
-    portfolio_weights, portfolio_sum, portfolio_reb_weights, portfolio_reb_sum = calculate_portfolio_weights(
-        portfolio, position_type)
-
-    portfolio_status_string = define_portfolio_status_string(portfolio_units, portfolio, position_type,
-                                                             portfolio_weights, portfolio_reb_weights, portfolio_sum)
-
-    # update the portfolio file using the updated prices
-    date_today = datetime.date.today().strftime('%d-%m-%Y')
-    update_portfolio_file(portfolio_file, date_today, portfolio_units, portfolio_sum, portfolio_weights)
-
-    portfolio_new, deltas_dict, total_sell_positions = sell_irrelevant_positions(portfolio,
-                                                                                 portfolio_target_weights)
-
-    portfolio_new, portfolio_target_weights = complete_missing_keys(portfolio_new, portfolio_target_weights)
-
-    portfolio_weights, portfolio_sum, portfolio_reb_weights, portfolio_reb_sum = calculate_portfolio_weights(
-        portfolio_new, position_type)
-
-    rebalance_needed = check_if_rebalance_needed(portfolio_weights, portfolio_reb_weights, portfolio_target_weights,
-                                                 tolerance, position_type)
-
-    if rebalance_needed == True:
-        portfolio_new2, deltas_dict = rebalance_portfolio(portfolio_new, portfolio_sum, minimal_weight_positions,
-                                                          portfolio_target_weights, deltas_dict, position_type)
-
-        portfolio_new3, sell_integer_stocks_dict, sell_integer_value_dict, buy_integer_stocks_dict, \
-        buy_integer_value_dict = rebalance_with_integer_operations(portfolio, portfolio_new, deltas_dict, stock_prices)
+        tickers = list(dict.fromkeys(list(portfolio_units) + list(portfolio_target_weights)))
+        stock_prices = get_stock_prices(tickers)
+        portfolio = calculate_portfolio_positions(portfolio_units, stock_prices)
 
         portfolio_weights, portfolio_sum, portfolio_reb_weights, portfolio_reb_sum = calculate_portfolio_weights(
-            portfolio_new3, position_type)
+            portfolio, position_type)
 
-        portfolio_status_post_string = define_portfolio_status_post_string(portfolio_new3, position_type,
-                                                                           portfolio_weights, portfolio_reb_weights,
-                                                                           portfolio_sum)
+        portfolio_status_string = define_portfolio_status_string(portfolio_units, portfolio, position_type,
+                                                                 portfolio_weights, portfolio_reb_weights,
+                                                                 portfolio_sum)
 
-        instructions = compose_rebalancing_instructions(sell_integer_stocks_dict, sell_integer_value_dict,
-                                                        total_sell_positions,
-                                                        buy_integer_stocks_dict, buy_integer_value_dict)
+        # update the portfolio file using the updated prices
+        date_today = datetime.date.today().strftime('%d-%m-%Y')
+        update_portfolio_file(portfolio_file, date_today, portfolio_units, portfolio_sum, portfolio_weights)
 
-        subject_line, message_lines = compose_email(date_today, portfolio_status_string, target_portfolio_string,
-                                                    instructions,
-                                                    portfolio_status_post_string)
+        portfolio_new, deltas_dict, total_sell_positions = sell_irrelevant_positions(portfolio,
+                                                                                     portfolio_target_weights)
 
-        if email_details_file is None:
-            print(subject_line)
-            for line in message_lines:
-                print(line)
-        else:
-            send_email(subject_line, message_lines, email_details_file=email_details_file)
+        portfolio_new, portfolio_target_weights = complete_missing_keys(portfolio_new, portfolio_target_weights)
+
+        portfolio_weights, portfolio_sum, portfolio_reb_weights, portfolio_reb_sum = calculate_portfolio_weights(
+            portfolio_new, position_type)
+
+        rebalance_needed = check_if_rebalance_needed(portfolio_weights, portfolio_reb_weights, portfolio_target_weights,
+                                                     tolerance, position_type)
+
+        if rebalance_needed == True:
+            portfolio_new2, deltas_dict = rebalance_portfolio(portfolio_new, portfolio_sum, minimal_weight_positions,
+                                                              portfolio_target_weights, deltas_dict, position_type)
+
+            portfolio_new3, sell_integer_stocks_dict, sell_integer_value_dict, buy_integer_stocks_dict, \
+                buy_integer_value_dict = rebalance_with_integer_operations(portfolio, portfolio_new, deltas_dict,
+                                                                           stock_prices)
+
+            portfolio_weights, portfolio_sum, portfolio_reb_weights, portfolio_reb_sum = calculate_portfolio_weights(
+                portfolio_new3, position_type)
+
+            portfolio_status_post_string = define_portfolio_status_post_string(portfolio_new3, position_type,
+                                                                               portfolio_weights, portfolio_reb_weights,
+                                                                               portfolio_sum)
+
+            instructions = compose_rebalancing_instructions(sell_integer_stocks_dict, sell_integer_value_dict,
+                                                            total_sell_positions,
+                                                            buy_integer_stocks_dict, buy_integer_value_dict)
+
+            subject_line, message_lines = compose_report(date_today, portfolio_status_string, target_portfolio_string,
+                                                         instructions,
+                                                         portfolio_status_post_string)
+
+            display_report_or_send_email(subject_line, message_lines, email_details_file)
+
+    except Exception as exception:
+        subject_line, message_lines = compose_error_report(date_today, exception)
+        display_report_or_send_email(subject_line, message_lines, email_details_file)
 
     return
+
 
 def read_target_portfolio(target_portfolio_file='target_portfolio.txt'):
     # read and interpret target_portfolio file
@@ -111,12 +118,14 @@ def read_target_portfolio(target_portfolio_file='target_portfolio.txt'):
 
     return tolerance, position_type, portfolio_target_weights, minimal_weight_positions
 
+
 def define_target_portfolio_string(portfolio_target_weights, position_type):
     target_portfolio_string = ['=== Portfolio Target ===']
     for ticker in portfolio_target_weights.keys():
         target_portfolio_string += [ticker + ': ' + str(portfolio_target_weights[ticker])
                                     + '% (' + position_type[ticker] + ')']
     return target_portfolio_string
+
 
 def check_portfolio_target_weights(portfolio_target_weights, position_type):
     # check that all percentages of minimal_weight positions are less than 100%
@@ -135,6 +144,8 @@ def check_portfolio_target_weights(portfolio_target_weights, position_type):
     if percent_counter_rebalanced != 100:
         raise ValueError('positions of "rebalanced" type do not add to 100%')
     return
+
+
 #
 def read_portfolio(portfolio_file='portfolio.txt'):
     # read portfolio file which records the portfolio history using number of stock units
@@ -152,11 +163,11 @@ def read_portfolio(portfolio_file='portfolio.txt'):
             for element in elements:
                 if '(' in element or ')' in element:
                     pass
-                elif mode == 'ticker': # reading ticker name
+                elif mode == 'ticker':  # reading ticker name
                     ticker = element
                     tickers += [ticker]
                     mode = 'value'
-                elif mode == 'value': # reading value
+                elif mode == 'value':  # reading value
                     # read number of shares of ticker or $ amount in case of cash
                     number_of_shares = float(element.split('#')[-1].split('$')[-1])
                     values += [number_of_shares]
@@ -171,8 +182,9 @@ def read_portfolio(portfolio_file='portfolio.txt'):
             portfolio_shares_history[date] = portfolio_shares
     return portfolio_shares, portfolio_shares_history
 
+
 def calculate_portfolio_weights(portfolio, position_type, verbosity=False):
-     # normalize the most recent portfolio values, for the total portfolio or just the rebalanced portion
+    # normalize the most recent portfolio values, for the total portfolio or just the rebalanced portion
     portfolio_sum = sum([portfolio[ticker] for ticker in portfolio.keys()])
     portfolio_weights = {}
     for ticker in portfolio.keys():
@@ -196,6 +208,7 @@ def calculate_portfolio_weights(portfolio, position_type, verbosity=False):
 
     return portfolio_weights, portfolio_sum, portfolio_reb_weights, portfolio_reb_sum
 
+
 def define_portfolio_status_string(portfolio_units, portfolio, position_type, portfolio_weights, portfolio_reb_weights,
                                    portfolio_sum):
     portfolio_status_string = ['=== Portfolio Status ===']
@@ -211,9 +224,10 @@ def define_portfolio_status_string(portfolio_units, portfolio, position_type, po
     portfolio_status_string += ['*** TOTAL: $' + '{:.2f}'.format(portfolio_sum)]
     return portfolio_status_string
 
+
 def get_stock_prices(tickers, date=None):
     # download stock prices for the portfolio positions
-    if date is not None: # None used for the most recent price
+    if date is not None:  # None used for the most recent price
         date_obj = datetime.datetime.strptime(date, '%d-%m-%Y')
         date_obj_minus5days = date_obj - datetime.timedelta(days=5)
 
@@ -223,7 +237,8 @@ def get_stock_prices(tickers, date=None):
             yf_ticker = yf.Ticker(ticker)
             if date is not None:
                 try:
-                    stock_prices[ticker] = yf_ticker.history(start=date_obj_minus5days, end=date_obj)['Close'].values[-1]
+                    stock_prices[ticker] = yf_ticker.history(start=date_obj_minus5days, end=date_obj)['Close'].values[
+                        -1]
                 except:
                     raise ValueError('problem with loading ' + ticker + ' stock date for ' + date)
             else:
@@ -232,12 +247,14 @@ def get_stock_prices(tickers, date=None):
             stock_prices[ticker] = 1.0
     return stock_prices
 
+
 def calculate_portfolio_positions(portfolio_shares, stock_prices):
     # calculate the portfolio positions values
     portfolio = {}
     for ticker in portfolio_shares.keys():
         portfolio[ticker] = portfolio_shares[ticker] * stock_prices[ticker]
     return portfolio
+
 
 def update_portfolio_file(portfolio_file, date_today, portfolio_units, portfolio_sum, portfolio_weights):
     # update the portfolio log file
@@ -268,7 +285,7 @@ def sell_irrelevant_positions(portfolio, portfolio_target_weights):
         if ticker == 'cash':
             portfolio_new['cash'] += portfolio[ticker]
         elif ticker in portfolio_target_weights.keys():
-        # if   portfolio_target_weights.keys():
+            # if   portfolio_target_weights.keys():
             portfolio_new[ticker] = portfolio[ticker]
         else:
             portfolio_new['cash'] += portfolio[ticker]
@@ -312,7 +329,8 @@ def check_if_rebalance_needed(portfolio_weights, portfolio_reb_weights, portfoli
     return rebalance_needed
 
 
-def rebalance_portfolio(portfolio_new, portfolio_sum, minimal_weight_positions, portfolio_target_weights, deltas_dict, position_type):
+def rebalance_portfolio(portfolio_new, portfolio_sum, minimal_weight_positions, portfolio_target_weights, deltas_dict,
+                        position_type):
     # buy the minimal_weights positions if necessary
     delta_minimal_weights_total = 0
     portfolio_new2 = copy.deepcopy(portfolio_new)
@@ -360,6 +378,7 @@ def rebalance_portfolio(portfolio_new, portfolio_sum, minimal_weight_positions, 
 
     return portfolio_new2, deltas_dict
 
+
 def rebalance_with_integer_operations(portfolio, portfolio_new, deltas_dict, stock_prices_today):
     # translate deltas_dict into integer stock amounts
     sell_integer_stocks_dict = {}
@@ -390,12 +409,12 @@ def rebalance_with_integer_operations(portfolio, portfolio_new, deltas_dict, sto
             elif ticker == 'cash' and deltas_dict[ticker] > 0:
                 portfolio_new3[ticker] += deltas_dict[ticker]
 
-
     return portfolio_new3, sell_integer_stocks_dict, sell_integer_value_dict, buy_integer_stocks_dict, \
-           buy_integer_value_dict
+        buy_integer_value_dict
 
 
-def define_portfolio_status_post_string(portfolio_new3, position_type, portfolio_weights, portfolio_reb_weights, portfolio_sum):
+def define_portfolio_status_post_string(portfolio_new3, position_type, portfolio_weights, portfolio_reb_weights,
+                                        portfolio_sum):
     portfolio_status_post_string = ['=== Portfolio Post Rebalancing (should approximately be) ===']
     for ticker in portfolio_new3.keys():
         if portfolio_weights[ticker] > 0.1:
@@ -432,10 +451,31 @@ def compose_rebalancing_instructions(sell_integer_stocks_dict, sell_integer_valu
 
     return instructions
 
-def compose_email(date_today, portfolio_status_string, target_portfolio_string, instructions,
-                  portfolio_status_post_string):
-    # add a section about the current stock prices and the state of the portfolio before and after the rebalancing
+
+def compose_report(date_today, portfolio_status_string, target_portfolio_string, instructions,
+                   portfolio_status_post_string):
+    # compose a report about the current stock prices and the state of the portfolio before and after rebalancing
     subject_line = 'Portfolio Alert! (' + date_today + ')'
     message_lines = portfolio_status_string + [''] + target_portfolio_string + [''] \
                     + instructions + [''] + portfolio_status_post_string
     return subject_line, message_lines
+
+
+def compose_error_report(date_today, exception):
+    # compose an error report if the code fails
+    subject_line = 'Error occured in Portfolio Alert code (' + date_today + ')'
+    error_type = type(exception).__name__
+    error_message = str(exception)
+    error_traceback = traceback.format_exc()
+    message_lines = ['*** error_type:', error_type, '', '*** error_message:', error_message,
+                     '', '*** error_traceback:', error_traceback]
+    return subject_line, message_lines
+
+
+def display_report_or_send_email(subject_line, message_lines, email_details_file):
+    if email_details_file is None:
+        print(subject_line)
+        for line in message_lines:
+            print(line)
+    else:
+        send_email(subject_line, message_lines, email_details_file=email_details_file)
