@@ -72,7 +72,7 @@ def run_portfolio_alert_algorithm(target_portfolio_file, portfolio_file, email_d
             display_report_or_send_email(subject_line, message_lines, email_details_file)
 
     except Exception as exception:
-        subject_line, message_lines = compose_error_report(date_today, exception)
+        subject_line, message_lines = compose_error_report(exception)
         display_report_or_send_email(subject_line, message_lines, email_details_file)
 
     return
@@ -461,9 +461,9 @@ def compose_report(date_today, portfolio_status_string, target_portfolio_string,
     return subject_line, message_lines
 
 
-def compose_error_report(date_today, exception):
+def compose_error_report(exception):
     # compose an error report if the code fails
-    subject_line = 'Error occured in Portfolio Alert code (' + date_today + ')'
+    subject_line = 'Error occured in Portfolio Alert code'
     error_type = type(exception).__name__
     error_message = str(exception)
     error_traceback = traceback.format_exc()
