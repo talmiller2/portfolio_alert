@@ -155,7 +155,7 @@ def read_portfolio(portfolio_file='portfolio.txt'):
     for line in lines:
         if line != '\n':
             date = line.split(':')[0]
-            elements = line.split(':')[1].split('\n')[0].strip().split(' ')
+            elements = line.split(':')[1].split('\n')[0].strip().split()
 
             tickers = []
             values = []
