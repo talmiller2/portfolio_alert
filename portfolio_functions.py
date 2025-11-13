@@ -112,7 +112,7 @@ def read_target_portfolio(target_portfolio_file='target_portfolio.txt'):
     if tolerance is None:
         raise ValueError('tolerance was not defined')
 
-    # add cash to positions_types is not defined
+    # add cash to positions_types if not defined
     if 'cash' not in position_type.keys():
         position_type['cash'] = 'rebalanced'
 
@@ -189,6 +189,11 @@ def calculate_portfolio_weights(portfolio, position_type, verbosity=False):
     portfolio_weights = {}
     for ticker in portfolio.keys():
         portfolio_weights[ticker] = portfolio[ticker] / portfolio_sum * 100
+
+    # add tickers that are in the portfolio currently but not in the target (will be liquidated)
+    for ticker in portfolio.keys():
+        if not ticker in position_type:
+            position_type[ticker] = 'rebalanced'
 
     if verbosity == True:
         print('portfolio_weights', portfolio_weights)
