@@ -16,7 +16,7 @@ def run_portfolio_alert_algorithm(target_portfolio_file, portfolio_file, email_d
 
         target_portfolio_string = define_target_portfolio_string(portfolio_target_weights, position_type)
 
-        check_portfolio_target_weights(portfolio_target_weights, position_type)
+        any_rebalanced_position_exists = check_portfolio_target_weights(portfolio_target_weights, position_type)
 
         portfolio_units, _ = read_portfolio(portfolio_file)
 
@@ -35,41 +35,44 @@ def run_portfolio_alert_algorithm(target_portfolio_file, portfolio_file, email_d
         date_today = datetime.date.today().strftime('%d-%m-%Y')
         update_portfolio_file(portfolio_file, date_today, portfolio_units, portfolio_sum, portfolio_weights)
 
-        portfolio_new, deltas_dict, total_sell_positions = sell_irrelevant_positions(portfolio,
-                                                                                     portfolio_target_weights)
+        # TODO: if any_rebalanced_position_exists=False because all positions are minimial_weight,
+        #  skip all following steps, and later code the logic for this case as well.
+        if any_rebalanced_position_exists == True:
+            portfolio_new, deltas_dict, total_sell_positions = sell_irrelevant_positions(portfolio,
+                                                                                         portfolio_target_weights)
 
-        portfolio_new, portfolio_target_weights = complete_missing_keys(portfolio_new, portfolio_target_weights)
-
-        portfolio_weights, portfolio_sum, portfolio_reb_weights, portfolio_reb_sum = calculate_portfolio_weights(
-            portfolio_new, position_type)
-
-        rebalance_needed = check_if_rebalance_needed(portfolio_weights, portfolio_reb_weights, portfolio_target_weights,
-                                                     tolerance, position_type)
-
-        if rebalance_needed == True:
-            portfolio_new2, deltas_dict = rebalance_portfolio(portfolio_new, portfolio_sum, minimal_weight_positions,
-                                                              portfolio_target_weights, deltas_dict, position_type)
-
-            portfolio_new3, sell_integer_stocks_dict, sell_integer_value_dict, buy_integer_stocks_dict, \
-                buy_integer_value_dict = rebalance_with_integer_operations(portfolio, portfolio_new, deltas_dict,
-                                                                           stock_prices)
+            portfolio_new, portfolio_target_weights = complete_missing_keys(portfolio_new, portfolio_target_weights)
 
             portfolio_weights, portfolio_sum, portfolio_reb_weights, portfolio_reb_sum = calculate_portfolio_weights(
-                portfolio_new3, position_type)
+                portfolio_new, position_type)
 
-            portfolio_status_post_string = define_portfolio_status_post_string(portfolio_new3, position_type,
-                                                                               portfolio_weights, portfolio_reb_weights,
-                                                                               portfolio_sum)
+            rebalance_needed = check_if_rebalance_needed(portfolio_weights, portfolio_reb_weights, portfolio_target_weights,
+                                                         tolerance, position_type)
 
-            instructions = compose_rebalancing_instructions(sell_integer_stocks_dict, sell_integer_value_dict,
-                                                            total_sell_positions,
-                                                            buy_integer_stocks_dict, buy_integer_value_dict)
+            if any_rebalanced_position_exists == True and rebalance_needed == True:
+                portfolio_new2, deltas_dict = rebalance_portfolio(portfolio_new, portfolio_sum, minimal_weight_positions,
+                                                                  portfolio_target_weights, deltas_dict, position_type)
 
-            subject_line, message_lines = compose_report(date_today, portfolio_status_string, target_portfolio_string,
-                                                         instructions,
-                                                         portfolio_status_post_string)
+                portfolio_new3, sell_integer_stocks_dict, sell_integer_value_dict, buy_integer_stocks_dict, \
+                    buy_integer_value_dict = rebalance_with_integer_operations(portfolio, portfolio_new, deltas_dict,
+                                                                               stock_prices)
 
-            display_report_or_send_email(subject_line, message_lines, email_details_file)
+                portfolio_weights, portfolio_sum, portfolio_reb_weights, portfolio_reb_sum = calculate_portfolio_weights(
+                    portfolio_new3, position_type)
+
+                portfolio_status_post_string = define_portfolio_status_post_string(portfolio_new3, position_type,
+                                                                                   portfolio_weights, portfolio_reb_weights,
+                                                                                   portfolio_sum)
+
+                instructions = compose_rebalancing_instructions(sell_integer_stocks_dict, sell_integer_value_dict,
+                                                                total_sell_positions,
+                                                                buy_integer_stocks_dict, buy_integer_value_dict)
+
+                subject_line, message_lines = compose_report(date_today, portfolio_status_string, target_portfolio_string,
+                                                             instructions,
+                                                             portfolio_status_post_string)
+
+                display_report_or_send_email(subject_line, message_lines, email_details_file)
 
     except Exception as exception:
         subject_line, message_lines = compose_error_report(exception)
@@ -134,16 +137,18 @@ def check_portfolio_target_weights(portfolio_target_weights, position_type):
         if position_type[ticker] == 'minimal_weight':
             percent_counter_minimal_weight += portfolio_target_weights[ticker]
     if percent_counter_minimal_weight > 100:
-        raise ValueError('positions of "minimal_weight" type are weighed > 100%')
+        raise ValueError('positions of "minimal_weight" type are weighed >100%')
 
-    # check that all percentages of rebalanced positions add up to 100%
+    # check that all percentages of rebalanced positions add up to 100% (if any such positions exist)
+    any_rebalanced_position_exists = False
     percent_counter_rebalanced = 0
     for ticker in portfolio_target_weights.keys():
         if position_type[ticker] == 'rebalanced':
+            any_rebalanced_position_exists = True
             percent_counter_rebalanced += portfolio_target_weights[ticker]
-    if percent_counter_rebalanced != 100:
+    if any_rebalanced_position_exists == True and percent_counter_rebalanced != 100:
         raise ValueError('positions of "rebalanced" type do not add to 100%')
-    return
+    return any_rebalanced_position_exists
 
 
 #
@@ -338,36 +343,36 @@ def rebalance_portfolio(portfolio_new, portfolio_sum, minimal_weight_positions, 
                         position_type):
     # buy the minimal_weights positions if necessary
     delta_minimal_weights_total = 0
-    portfolio_new2 = copy.deepcopy(portfolio_new)
+    portfolio_new_copy = copy.deepcopy(portfolio_new) # to avoid editing the original
     for ticker in minimal_weight_positions:
         delta = portfolio_sum * portfolio_target_weights[ticker] / 100.0 - portfolio_new[ticker]
         if delta > 0:
             deltas_dict[ticker] = delta
-            portfolio_new2[ticker] += delta
+            portfolio_new_copy[ticker] += delta
             delta_minimal_weights_total += delta
 
     # if the minimal_weights portion increased, need to proportional reduce the rebalanced portion
     portfolio_weights, portfolio_sum, portfolio_reb_weights, portfolio_reb_sum = calculate_portfolio_weights(
-        portfolio_new2, position_type)
+        portfolio_new_copy, position_type)
 
     reduce_rebalanced_factor = (portfolio_reb_sum - delta_minimal_weights_total) / portfolio_reb_sum
     delta_rebalanced_total = 0
 
-    for ticker in portfolio_new2.keys():
+    for ticker in portfolio_new_copy.keys():
         if position_type[ticker] == 'rebalanced':
-            delta = - (1 - reduce_rebalanced_factor) * portfolio_new2[ticker]
+            delta = - (1 - reduce_rebalanced_factor) * portfolio_new_copy[ticker]
             if ticker not in deltas_dict.keys():
                 deltas_dict[ticker] = 0  # initialize
             deltas_dict[ticker] += delta
-            portfolio_new2[ticker] += delta
+            portfolio_new_copy[ticker] += delta
             delta_rebalanced_total += delta
 
     # the left-over from the minimal_weights positions is the rebalanced portion of the portfolio
     portfolio_weights, portfolio_sum, portfolio_reb_weights, portfolio_reb_sum = calculate_portfolio_weights(
-        portfolio_new2, position_type)
+        portfolio_new_copy, position_type)
 
     # buy/sell the rebalanced positions
-    for ticker in portfolio_new2.keys():
+    for ticker in portfolio_new_copy.keys():
         if position_type[ticker] == 'rebalanced':
 
             if ticker not in portfolio_reb_weights.keys():
@@ -375,13 +380,13 @@ def rebalance_portfolio(portfolio_new, portfolio_sum, minimal_weight_positions, 
 
             delta = portfolio_reb_sum * (portfolio_target_weights[ticker] - portfolio_reb_weights[ticker]) / 100.0
             deltas_dict[ticker] += delta
-            portfolio_new2[ticker] += delta
+            portfolio_new_copy[ticker] += delta
 
     # check deltas_dict sums to zero
     if abs(sum([deltas_dict[ticker] for ticker in deltas_dict.keys()])) > 1e-10:
         raise ValueError('deltas_dict does not sum to zero.')
 
-    return portfolio_new2, deltas_dict
+    return portfolio_new_copy, deltas_dict
 
 
 def rebalance_with_integer_operations(portfolio, portfolio_new, deltas_dict, stock_prices_today):
